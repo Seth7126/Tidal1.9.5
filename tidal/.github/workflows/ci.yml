@@ -1,0 +1,94 @@
+name: ci
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  cabal:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        versions:
+          - ghc: latest
+            cabal: latest
+            args: --allow-newer=base,template-haskell
+            experimental: true
+          - ghc: 9.4.1
+            cabal: 3.8.1.0
+            args: --allow-newer=base,template-haskell
+            experimental: false
+          - ghc: 9.0.1
+            cabal: 3.4.0.0
+            args: --allow-newer=base,template-haskell
+            experimental: false
+          - ghc: 8.10.1
+            cabal: 3.4.0.0
+            args: --allow-newer=base,template-haskell
+            experimental: false
+          - ghc: 8.8.3
+            cabal: 3.4.0.0
+            args: --allow-newer=base,template-haskell
+            experimental: false
+          - ghc: 8.6.5
+            cabal: 3.4.0.0
+            experimental: false
+          - ghc: 8.4.4
+            cabal: 3.4.0.0
+            experimental: false
+
+    continue-on-error: ${{ matrix.versions.experimental }}
+    name: cabal ${{ matrix.versions.cabal }} - ghc ${{ matrix.versions.ghc }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: cache ~/.cabal/packages, ~/.cabal/store and dist-newstyle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+            dist-newstyle
+          key: cabal-${{ runner.os }}-${{ matrix.versions.ghc }}
+
+      - name: install cabal and ghc
+        uses: haskell/actions/setup@v1
+        with:
+          ghc-version: ${{ matrix.versions.ghc }}
+          cabal-version: ${{ matrix.versions.cabal }}
+
+      - name: update
+        run: cabal v2-update
+
+      - name: build
+        run: cabal v2-build ${{ matrix.versions.args }} --enable-tests --enable-benchmarks all
+
+      - name: test
+        run: cabal v2-test ${{ matrix.versions.args }} --enable-tests --enable-benchmarks all
+  stack:
+    runs-on: ubuntu-latest
+    name: stack resolver
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set nightly resolver version
+        run: echo "LTS_RESOLVER=$(stack ls snapshots --lts remote | tail -3 | head -1 | awk '{print $3}')" >> $GITHUB_ENV
+
+      - name: cache ~/.stack
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.stack
+          key: stack-${{ runner.os }}-${{ env.LTS_RESOLVER }}
+
+      - name: install stack and ghc
+        uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          ghc-version: latest
+
+      - name: test
+        run: stack --no-terminal --resolver ${{ env.LTS_RESOLVER }} --system-ghc test --haddock --no-haddock-deps

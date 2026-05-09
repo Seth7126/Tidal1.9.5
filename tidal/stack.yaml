@@ -1,0 +1,13 @@
+resolver: lts-22.8
+
+packages:
+  - '.'
+  - 'tidal-parse'
+  - 'tidal-listener'
+  - 'tidal-link'
+
+extra-deps:
+  - hosc-0.20
+  - haskellish-0.3.2.2
+
+
